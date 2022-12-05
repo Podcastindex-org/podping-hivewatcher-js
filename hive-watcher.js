@@ -56,11 +56,11 @@ const addressList = [
 shuffleArray(addressList)
 console.log(`Using API address "${addressList[0]}"`)
 const client = new dhive.Client(
-    addressList, {
-        // reducing timeout and threshold makes fall over to other API address happen faster
-        timeout: 6000, // in ms
-        failoverThreshold: 1,
-    }
+        addressList, {
+            // reducing timeout and threshold makes fall over to other API address happen faster
+            timeout: 6000, // in ms
+            failoverThreshold: 1,
+        }
 );
 
 let validAccounts = ['podping']
@@ -155,15 +155,17 @@ function handlePodpingPost(post, timestamp, blockNumber, transactionId) {
     let updateReason = postJson.reason || postJson.r || postJson.type
     let medium = postJson.medium
 
-    if (version === "1.0") {
-        if (!(PodpingReason.includes(updateReason) && PodpingMedium.includes(medium))) {
-            return
-        }
-    } else {
+    let versionValue = parseFloat(version)
+    if (isNaN(versionValue)) {
         // fallback to any possible
         // old posts didn't include an update type so still accept them
         if (updateReason !== undefined && updateReason !== "feed_update" && updateReason !== 1)
             return
+    } else {
+        // handle version 1.0 and newer
+        if (!(PodpingReason.includes(updateReason) && PodpingMedium.includes(medium))) {
+            return
+        }
     }
 
     let iris = postJson.iris || []
@@ -222,21 +224,21 @@ function isAccountAllowed(required_posting_auths) {
 }
 
 client.database.call('get_following', [validAccounts[0], null, 'blog', 100])
-    .then(
-        /**
-         * Get all accounts that are accepted as a valid PodPing poster
-         *
-         * @param followers list of follower objects
-         */
-        function (followers) {
-            for (let follower of followers) {
-                validAccounts = validAccounts.concat(follower.following)
-            }
-        }
-    )
-    .then(
-        startStream
-    )
+        .then(
+                /**
+                 * Get all accounts that are accepted as a valid PodPing poster
+                 *
+                 * @param followers list of follower objects
+                 */
+                function (followers) {
+                    for (let follower of followers) {
+                        validAccounts = validAccounts.concat(follower.following)
+                    }
+                }
+        )
+        .then(
+                startStream
+        )
 ;
 
 function startStream(blockNumber = undefined) {
@@ -247,20 +249,20 @@ function startStream(blockNumber = undefined) {
         from: blockNumber,
         mode: dhive.BlockchainMode.Latest
     })
-        .on('data', handleBlock)
-        .on('error',
-            function (error) {
-                console.error('Error occurred parsing stream')
-                console.error(error)
-                // Note: when an error occurs, the `end` event is emitted (see below)
-            }
-        )
-        .on('end',
-            function () {
-                console.log('Reached end of stream')
-                // Note: this restart the stream
-                startStream(lastBlockNumber);
-            }
-        );
+            .on('data', handleBlock)
+            .on('error',
+                    function (error) {
+                        console.error('Error occurred parsing stream')
+                        console.error(error)
+                        // Note: when an error occurs, the `end` event is emitted (see below)
+                    }
+            )
+            .on('end',
+                    function () {
+                        console.log('Reached end of stream')
+                        // Note: this restart the stream
+                        startStream(lastBlockNumber);
+                    }
+            );
 
 }
